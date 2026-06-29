@@ -100,11 +100,6 @@ app.post('/api/gardeners', auth, (req, res) => {
   }
 });
 
-app.delete('/api/gardeners/:id', auth, (req, res) => {
-  db.prepare('DELETE FROM gardeners WHERE id=?').run(req.params.id);
-  res.json({ ok: true });
-});
-
 app.post('/api/incomes', auth, (req, res) => {
   const b = z.object({
     gardener_id: z.number(),
@@ -203,14 +198,14 @@ app.delete('/api/gardeners/:id', auth, (req, res) => {
   try {
     const id = Number(req.params.id);
 
-    db.prepare('PRAGMA foreign_keys = OFF').run();
+    const deleteGardener = db.transaction((gardenerId) => {
+      db.prepare('DELETE FROM payments WHERE gardener_id = ?').run(gardenerId);
+      db.prepare('DELETE FROM sales WHERE gardener_id = ?').run(gardenerId);
+      db.prepare('DELETE FROM incomes WHERE gardener_id = ?').run(gardenerId);
+      db.prepare('DELETE FROM gardeners WHERE id = ?').run(gardenerId);
+    });
 
-    db.prepare('DELETE FROM payments WHERE gardener_id = ?').run(id);
-    db.prepare('DELETE FROM sales WHERE gardener_id = ?').run(id);
-    db.prepare('DELETE FROM incomes WHERE gardener_id = ?').run(id);
-    db.prepare('DELETE FROM gardeners WHERE id = ?').run(id);
-
-    db.prepare('PRAGMA foreign_keys = ON').run();
+    deleteGardener(id);
 
     res.json({ ok: true });
   } catch (e) {
@@ -218,7 +213,6 @@ app.delete('/api/gardeners/:id', auth, (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
-
 app.use((err, req, res, next) => {
   console.error(err);
 
