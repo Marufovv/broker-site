@@ -199,8 +199,14 @@ app.post('/api/payments', auth, (req, res) => {
   res.json(db.prepare('SELECT * FROM payments WHERE id=?').get(id));
 });
 
-app.delete('/api/payments/:id', auth, (req, res) => {
-  db.prepare('DELETE FROM payments WHERE id=?').run(req.params.id);
+app.delete('/api/gardeners/:id', auth, (req, res) => {
+  const id = req.params.id;
+
+  db.prepare('DELETE FROM payments WHERE gardener_id=?').run(id);
+  db.prepare('DELETE FROM sales WHERE gardener_id=?').run(id);
+  db.prepare('DELETE FROM incomes WHERE gardener_id=?').run(id);
+  db.prepare('DELETE FROM gardeners WHERE id=?').run(id);
+
   res.json({ ok: true });
 });
 
