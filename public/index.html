@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>BROKER</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+  <div id="loginPage" class="login-page">
+    <div class="login-card">
+      <div class="brand-mark">📊</div>
+      <h1>BROKER</h1>
+      <p>Hisob-kitob tizimiga kiring</p>
+
+      <input id="loginInput" placeholder="Ism kiriting" autocomplete="username">
+      <input id="passwordInput" type="password" placeholder="Raqamni yozing" autocomplete="current-password">
+
+      <button onclick="login()">Kirish</button>
+      <small id="loginError"></small>
+    </div>
+  </div>
+
+  <div id="app" class="app hidden">
+    <aside class="sidebar">
+      <div class="logo">
+        <span>📊</span>
+        <div>BROKER<br><b>ERP</b></div>
+      </div>
+
+      <button class="nav active" data-page="dashboard">🏠 Bosh sahifa</button>
+      <button class="nav" data-page="gardeners">👥 Bog‘bonlar</button>
+      <button class="nav" data-page="income">📥 Kirimlar</button>
+      <button class="nav" data-page="sales">🛒 Savdolar</button>
+      <button class="nav" data-page="payments">💸 To‘lovlar</button>
+      <button class="nav" data-page="debts">💳 Qarzlar</button>
+      <button class="nav" data-page="reports">📊 Hisobot</button>
+      <button class="nav" data-page="settings">⚙️ Sozlamalar</button>
+
+      <button class="logout" onclick="logout()">↪ Chiqish</button>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <h2>Xush kelibsiz, <span id="userName"></span>!</h2>
+          <p id="todayText"></p>
+        </div>
+
+        <div class="top-actions">
+          <input type="date" id="globalDate" onchange="renderAll()">
+          <span class="bell">🔔</span>
+          <span class="avatar">👤</span>
+        </div>
+      </header>
+
+      <section id="dashboard" class="page active-page">
+        <div class="cards">
+          <div class="card">
+            <div>📥</div>
+            <p>Bugungi kirim qiymati</p>
+            <h3 id="statIncome">0 so‘m</h3>
+            <small id="statIncomeKg">0 kg</small>
+          </div>
+
+          <div class="card">
+            <div>🛒</div>
+            <p>Bugungi sotuv</p>
+            <h3 id="statSales">0 so‘m</h3>
+          </div>
+
+          <div class="card">
+            <div>💰</div>
+            <p>Sof foyda</p>
+            <h3 id="statProfit">0 so‘m</h3>
+          </div>
+
+          <div class="card">
+            <div>👥</div>
+            <p>Faol bog‘bonlar</p>
+            <h3 id="statGardeners">0 nafar</h3>
+          </div>
+        </div>
+
+        <div class="grid two">
+          <div class="panel">
+            <h3>Kirim va sotuv statistikasi</h3>
+            <canvas id="mainChart"></canvas>
+          </div>
+
+          <div class="panel">
+            <h3>Hisobot sanasi</h3>
+            <div id="calendarBox" class="calendar"></div>
+          </div>
+        </div>
+
+        <div class="grid two">
+          <div class="panel">
+            <h3>So‘nggi kirimlar</h3>
+            <div id="latestIncome"></div>
+          </div>
+
+          <div class="panel red-panel">
+            <h3>Tezkor ma’lumot</h3>
+            <p>Ombordagi mahsulot: <b id="stockKg">0 kg</b></p>
+            <p>Jami korzinka: <b id="stockBasket">0 ta</b></p>
+            <p>Berilishi kerak jami: <b id="debtTotal">0 so‘m</b></p>
+            <p>Berilgan pul aylanishi: <b id="paidTotalFast">0 so‘m</b></p>
+          </div>
+        </div>
+      </section>
+
+      <section id="gardeners" class="page">
+        <div class="cards compact">
+          <div class="card"><div>🥇</div><p>Eng katta sotuv</p><h3 id="topGardener">-</h3></div>
+          <div class="card"><div>📈</div><p>O‘sayotgan bog‘bonlar</p><h3 id="growCount">0 ta</h3></div>
+          <div class="card"><div>📉</div><p>Pasayayotgan bog‘bonlar</p><h3 id="downCount">0 ta</h3></div>
+          <div class="card"><div>⚖️</div><p>O‘rtacha kg</p><h3 id="avgKg">0 kg</h3></div>
+        </div>
+
+        <div class="grid two">
+          <div class="panel">
+            <h3>Bog‘bonlar statistikasi</h3>
+            <canvas id="gardenersChart"></canvas>
+          </div>
+
+          <div class="panel">
+            <h3>Tahlil</h3>
+            <div id="gardenerAnalysis" class="analysis-box"></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="section-head">
+            <h3>Bog‘bonlar ro‘yxati</h3>
+            <input id="gardenerSearch" placeholder="Bog‘bon qidirish..." oninput="renderGardeners()">
+          </div>
+
+          <form class="form" onsubmit="addGardener(event)">
+            <input id="gName" placeholder="Ism familiya" required>
+            <input id="gPhone" placeholder="Telefon raqam">
+            <button>Qo‘shish</button>
+          </form>
+
+          <div id="gardenersTable"></div>
+        </div>
+      </section>
+
+      <section id="income" class="page">
+        <div class="panel">
+          <h3>Kirim kiritish</h3>
+          <p class="hint">Hisob: korzinka soni × 1 korzinka kg = jami kg. Jami kg × 1 kg narx = umumiy summa.</p>
+
+          <form class="form wide" onsubmit="addIncome(event)">
+            <select id="incomeGardener" required></select>
+            <input id="incomePeachType" list="peachTypeList" placeholder="Shaftoli turi: masalan Super 2" required>
+<datalist id="peachTypeList">
+  <option value="Super 2">
+  <option value="Super 1">
+  <option value="Lola">
+  <option value="Nektarin">
+  <option value="Boshqa">
+</datalist>
+            <input id="incomeDate" type="date" required>
+            <input id="incomeBasket" type="number" min="0" step="1" placeholder="Korzinka soni" oninput="calcIncomePreview()" required>
+            <input id="incomeKgPerBasket" type="number" min="0" step="0.01" placeholder="1 korzinka kg" oninput="calcIncomePreview()" required>
+            <input id="incomeBuyPrice" type="number" min="0" step="1" placeholder="1 kg olish narxi" oninput="calcIncomePreview()" required>
+            <input id="incomeSellPrice" type="number" min="0" step="1" placeholder="1 kg sotish narxi" oninput="calcIncomePreview()" required>
+            <button>Kirimni saqlash</button>
+          </form>
+
+          <div id="incomePreview" class="preview"></div>
+          <div id="incomeTable"></div>
+        </div>
+      </section>
+
+      <section id="sales" class="page">
+        <div class="panel">
+          <h3>Savdolar</h3>
+
+          <form class="form wide" onsubmit="addSale(event)">
+            <select id="saleGardener" required></select>
+            <input id="saleDate" type="date" required>
+            <input id="saleKg" type="number" placeholder="Sotilgan kg" required>
+            <input id="saleAmount" type="number" placeholder="Sotuv summasi" required>
+            <input id="saleCustomer" placeholder="Xaridor nomi">
+            <button>Savdoni saqlash</button>
+          </form>
+
+          <div id="salesTable"></div>
+        </div>
+      </section>
+
+      <section id="payments" class="page">
+        <div class="cards compact">
+          <div class="card"><div>💸</div><p>Tanlangan kundagi to‘lov</p><h3 id="dayPaid">0 so‘m</h3></div>
+          <div class="card"><div>🔁</div><p>Umumiy berilgan pul</p><h3 id="allPaid">0 so‘m</h3></div>
+          <div class="card"><div>👤</div><p>To‘lov olganlar</p><h3 id="paidPeople">0 nafar</h3></div>
+          <div class="card"><div>📅</div><p>To‘lovlar soni</p><h3 id="paymentCount">0 ta</h3></div>
+        </div>
+
+        <div class="panel">
+          <h3>To‘lov kiritish</h3>
+
+          <form class="form wide" onsubmit="addPayment(event)">
+            <select id="paymentGardener" required></select>
+            <input id="paymentDate" type="date" required>
+            <input id="paymentAmount" type="number" min="0" placeholder="Berilgan summa" required>
+            <input id="paymentNote" placeholder="Izoh">
+            <button>To‘lovni saqlash</button>
+          </form>
+
+          <div id="paymentsTable"></div>
+        </div>
+      </section>
+
+      <section id="debts" class="page">
+        <div class="cards compact">
+          <div class="card"><div>📌</div><p>Berish kerak jami</p><h3 id="debtNeedKpi">0 so‘m</h3></div>
+          <div class="card"><div>✅</div><p>Berilgan jami</p><h3 id="debtPaidKpi">0 so‘m</h3></div>
+          <div class="card"><div>⏳</div><p>Qolgan qarz</p><h3 id="debtLeftKpi">0 so‘m</h3></div>
+          <div class="card"><div>🔁</div><p>Pul aylanishi</p><h3 id="moneyTurnoverKpi">0 so‘m</h3></div>
+        </div>
+
+        <div class="panel">
+          <h3>Qarzlar</h3>
+          <p class="hint">Qarz = bog‘bonga berilishi kerak pul − shu bog‘bonga berilgan to‘lovlar.</p>
+          <div id="debtsTable"></div>
+        </div>
+      </section>
+
+      <section id="reports" class="page">
+        <div class="panel">
+          <h3>Kunlik hisobot</h3>
+          <div id="reportBox" class="report-grid"></div>
+        </div>
+      </section>
+
+      <section id="settings" class="page">
+        <div class="panel">
+          <h2>⚙️ Sozlamalar</h2>
+
+          <div class="cards compact">
+            <div class="card">
+              <div>🏢</div>
+              <p>Kompaniya nomi</p>
+              <h3>BROKER</h3>
+            </div>
+
+            <div class="card">
+              <div>🚀</div>
+              <p>Tizim versiyasi</p>
+              <h3>2.0</h3>
+            </div>
+
+            <div class="card">
+              <div>🟢</div>
+              <p>Server holati</p>
+              <h3>Online</h3>
+            </div>
+
+            <div class="card">
+              <div>💾</div>
+              <p>Database</p>
+              <h3>Connected</h3>
+            </div>
+          </div>
+
+          <div class="grid two">
+            <div class="panel">
+              <h3>Loginlar</h3>
+              <p><b>iskandar</b> / 744</p>
+              <p><b>ulugbek</b> / 708</p>
+              <p><b>ozodbek</b> / 055</p>
+            </div>
+
+            <div class="panel red-panel">
+              <h3>Keyingi qo‘shiladigan funksiyalar</h3>
+              <p>Backup</p>
+              <p>Excel hisobot</p>
+              <p>PDF hisobot</p>
+              <p>Admin panel</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
