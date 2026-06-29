@@ -2,14 +2,17 @@ const { Pool } = require('pg');
 require('dotenv').config();
 
 if (!process.env.DATABASE_URL) {
-  throw new Error('DATABASE_URL topilmadi. Render Environment ichiga DATABASE_URL qo‘shing.');
+  throw new Error('DATABASE_URL topilmadi');
 }
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false
+  }
 });
 
-async function query(text, params = []) {
+function query(text, params = []) {
   return pool.query(text, params);
 }
 
@@ -34,13 +37,13 @@ async function initDatabase() {
       gardener_id INTEGER NOT NULL REFERENCES gardeners(id) ON DELETE CASCADE,
       date TEXT NOT NULL,
       peach_type TEXT DEFAULT '',
-      basket INTEGER NOT NULL,
-      kg_per_basket REAL NOT NULL,
-      total_kg REAL NOT NULL,
-      buy_price REAL NOT NULL,
-      sell_price REAL NOT NULL,
-      buy_total REAL NOT NULL,
-      sell_total REAL NOT NULL,
+      basket REAL DEFAULT 0,
+      kg_per_basket REAL DEFAULT 0,
+      total_kg REAL DEFAULT 0,
+      buy_price REAL DEFAULT 0,
+      sell_price REAL DEFAULT 0,
+      buy_total REAL DEFAULT 0,
+      sell_total REAL DEFAULT 0,
       note TEXT DEFAULT '',
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
@@ -49,8 +52,8 @@ async function initDatabase() {
       id SERIAL PRIMARY KEY,
       gardener_id INTEGER NOT NULL REFERENCES gardeners(id) ON DELETE CASCADE,
       date TEXT NOT NULL,
-      kg REAL NOT NULL,
-      amount REAL NOT NULL,
+      kg REAL DEFAULT 0,
+      amount REAL DEFAULT 0,
       customer TEXT DEFAULT '',
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
@@ -59,7 +62,7 @@ async function initDatabase() {
       id SERIAL PRIMARY KEY,
       gardener_id INTEGER NOT NULL REFERENCES gardeners(id) ON DELETE CASCADE,
       date TEXT NOT NULL,
-      amount REAL NOT NULL,
+      amount REAL DEFAULT 0,
       note TEXT DEFAULT '',
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );

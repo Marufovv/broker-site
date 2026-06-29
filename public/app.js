@@ -63,21 +63,34 @@ function gardenerName(id) {
 function mapIncome(x) {
   return {
     ...x,
-    gardenerId: x.gardener_id,
-    peachType: x.peach_type || '',
-    kgPerBasket: x.kg_per_basket,
-    totalKg: x.total_kg,
-    buyPrice: x.buy_price,
-    sellPrice: x.sell_price,
-    buyTotal: x.buy_total,
-    sellTotal: x.sell_total
+    gardenerId: x.gardener_id ?? x.gardenerId,
+    peachType: x.peach_type ?? x.peachType ?? '',
+    kgPerBasket: x.kg_per_basket ?? x.kgPerBasket,
+    totalKg: x.total_kg ?? x.totalKg,
+    buyPrice: x.buy_price ?? x.buyPrice,
+    sellPrice: x.sell_price ?? x.sellPrice,
+    buyTotal: x.buy_total ?? x.buyTotal,
+    sellTotal: x.sell_total ?? x.sellTotal
   };
 }
 
 function normalize() {
-  db.incomes = db.incomes.map(mapIncome);
-  db.sales = db.sales.map(x => ({ ...x, gardenerId: x.gardener_id }));
-  db.payments = db.payments.map(x => ({ ...x, gardenerId: x.gardener_id }));
+  db.gardeners = (db.gardeners || []).map(x => ({ ...x, id: Number(x.id) }));
+  db.incomes = (db.incomes || []).map(mapIncome).map(x => ({
+    ...x,
+    id: Number(x.id),
+    gardenerId: Number(x.gardenerId)
+  }));
+  db.sales = (db.sales || []).map(x => ({
+    ...x,
+    id: Number(x.id),
+    gardenerId: Number(x.gardener_id ?? x.gardenerId)
+  }));
+  db.payments = (db.payments || []).map(x => ({
+    ...x,
+    id: Number(x.id),
+    gardenerId: Number(x.gardener_id ?? x.gardenerId)
+  }));
 }
 
 async function loadState() {
@@ -295,10 +308,15 @@ async function addPayment(e) {
 }
 
 async function del(type, id) {
-  if (!confirm('O‘chirasizmi?')) return;
+  try {
+    if (!confirm('O‘chirasizmi?')) return;
 
-  await api('/api/' + type + '/' + id, { method: 'DELETE' });
-  await loadState();
+    await api('/api/' + type + '/' + id, { method: 'DELETE' });
+    await loadState();
+  } catch (err) {
+    console.error('O‘chirish xatosi:', err);
+    alert('O‘chirish xatosi: ' + err.message);
+  }
 }
 
 function renderSelects() {
