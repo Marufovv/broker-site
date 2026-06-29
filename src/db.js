@@ -13,6 +13,7 @@ const db = new DatabaseSync(full);
 
 db.exec(`
 PRAGMA journal_mode = WAL;
+PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -32,6 +33,7 @@ CREATE TABLE IF NOT EXISTS incomes (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   gardener_id INTEGER NOT NULL,
   date TEXT NOT NULL,
+  peach_type TEXT DEFAULT '',
   basket INTEGER NOT NULL,
   kg_per_basket REAL NOT NULL,
   total_kg REAL NOT NULL,
@@ -41,7 +43,7 @@ CREATE TABLE IF NOT EXISTS incomes (
   sell_total REAL NOT NULL,
   note TEXT DEFAULT '',
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY(gardener_id) REFERENCES gardeners(id)
+  FOREIGN KEY(gardener_id) REFERENCES gardeners(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS sales (
@@ -52,7 +54,7 @@ CREATE TABLE IF NOT EXISTS sales (
   amount REAL NOT NULL,
   customer TEXT DEFAULT '',
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY(gardener_id) REFERENCES gardeners(id)
+  FOREIGN KEY(gardener_id) REFERENCES gardeners(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS payments (
@@ -62,12 +64,10 @@ CREATE TABLE IF NOT EXISTS payments (
   amount REAL NOT NULL,
   note TEXT DEFAULT '',
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY(gardener_id) REFERENCES gardeners(id)
+  FOREIGN KEY(gardener_id) REFERENCES gardeners(id) ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_incomes_date ON incomes(date);
 CREATE INDEX IF NOT EXISTS idx_sales_date ON sales(date);
 CREATE INDEX IF NOT EXISTS idx_payments_date ON payments(date);
 `);
-
-module.exports = db;

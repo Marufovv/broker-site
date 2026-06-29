@@ -196,17 +196,7 @@ app.post('/api/payments', auth, (req, res) => {
 
 app.delete('/api/gardeners/:id', auth, (req, res) => {
   try {
-    const id = Number(req.params.id);
-
-    const deleteGardener = db.transaction((gardenerId) => {
-      db.prepare('DELETE FROM payments WHERE gardener_id = ?').run(gardenerId);
-      db.prepare('DELETE FROM sales WHERE gardener_id = ?').run(gardenerId);
-      db.prepare('DELETE FROM incomes WHERE gardener_id = ?').run(gardenerId);
-      db.prepare('DELETE FROM gardeners WHERE id = ?').run(gardenerId);
-    });
-
-    deleteGardener(id);
-
+    db.prepare('DELETE FROM gardeners WHERE id = ?').run(Number(req.params.id));
     res.json({ ok: true });
   } catch (e) {
     console.error('Bog‘bon o‘chirish xatosi:', e);
