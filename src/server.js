@@ -21,119 +21,118 @@ app.use(morgan('tiny'));
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 function tokenFor(user) {
-  return jwt.sign(
-    { id: user.id, username: user.username },
-    JWT_SECRET,
-    { expiresIn: '7d' }
-  );
+  return jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, { expiresIn: '7d' });
 }
 
 function auth(req, res, next) {
   const h = req.headers.authorization || '';
   const t = h.startsWith('Bearer ') ? h.slice(7) : '';
-
   try {
     req.user = jwt.verify(t, JWT_SECRET);
     next();
-  } catch (e) {
+  } catch {
     res.status(401).json({ error: 'Avval login qiling' });
   }
 }
 
-function all(sql, args = []) {
-  return db.prepare(sql).all(...args);
-}
+app.post('/api/login', async (req, res, next) => {
+  try {
+    const body = z.object({
+      username: z.string().min(1),
+      password: z.string().min(1)
+    }).parse(req.body);
 
-function run(sql, args = []) {
-  const r = db.prepare(sql).run(...args);
-  return r.lastInsertRowid;
-}
+    const result = await db.query(
+      'SELECT * FROM users WHERE username=$1',
+      [body.username.toLowerCase().trim()]
+    );
 
-app.post('/api/login', (req, res) => {
-  const body = z.object({
-    username: z.string().min(1),
-    password: z.string().min(1)
-  }).parse(req.body);
+    const u = result.rows[0];
 
-  const u = db.prepare('SELECT * FROM users WHERE username=?')
-    .get(body.username.toLowerCase().trim());
+    if (!u || !bcrypt.compareSync(body.password, u.password_hash)) {
+      return res.status(401).json({ error: 'Login yoki parol xato' });
+    }
 
-  if (!u || !bcrypt.compareSync(body.password, u.password_hash)) {
-    return res.status(401).json({ error: 'Login yoki parol xato' });
+    res.json({ token: tokenFor(u), user: { username: u.username } });
+  } catch (e) {
+    next(e);
   }
-
-  res.json({
-    token: tokenFor(u),
-    user: { username: u.username }
-  });
 });
 
 app.get('/api/me', auth, (req, res) => {
   res.json({ user: { username: req.user.username } });
 });
 
-app.get('/api/state', auth, (req, res) => {
-  res.json({
-    gardeners: all('SELECT * FROM gardeners ORDER BY name'),
-    incomes: all('SELECT * FROM incomes ORDER BY date DESC, id DESC'),
-    sales: all('SELECT * FROM sales ORDER BY date DESC, id DESC'),
-    payments: all('SELECT * FROM payments ORDER BY date DESC, id DESC')
-  });
+app.get('/api/state', auth, async (req, res, next) => {
+  try {
+    const gardeners = await db.query('SELECT * FROM gardeners ORDER BY name');
+    const incomes = await db.query('SELECT * FROM incomes ORDER BY date DESC, id DESC');
+    const sales = await db.query('SELECT * FROM sales ORDER BY date DESC, id DESC');
+    const payments = await db.query('SELECT * FROM payments ORDER BY date DESC, id DESC');
+
+    res.json({
+      gardeners: gardeners.rows,
+      incomes: incomes.rows,
+      sales: sales.rows,
+      payments: payments.rows
+    });
+  } catch (e) {
+    next(e);
+  }
 });
 
-app.post('/api/gardeners', auth, (req, res) => {
+app.post('/api/gardeners', auth, async (req, res, next) => {
   try {
     const b = z.object({
       name: z.string().min(2),
       phone: z.string().optional().default('')
     }).parse(req.body);
 
-    const id = run(
-      'INSERT INTO gardeners(name, phone) VALUES(?, ?)',
+    const result = await db.query(
+      'INSERT INTO gardeners(name, phone) VALUES($1, $2) RETURNING *',
       [b.name.trim(), b.phone.trim()]
     );
 
-    res.json(db.prepare('SELECT * FROM gardeners WHERE id=?').get(id));
+    res.json(result.rows[0]);
   } catch (e) {
-    console.error('Bog‘bon qo‘shish xatosi:', e);
-    res.status(400).json({ error: 'Bog‘bon ma’lumoti noto‘g‘ri kiritildi' });
+    next(e);
   }
 });
 
-app.post('/api/incomes', auth, (req, res) => {
-  const b = z.object({
-    gardener_id: z.number(),
-    date: z.string(),
-    peach_type: z.string().optional().default(''),
-    basket: z.number().nonnegative(),
-    kg_per_basket: z.number().nonnegative(),
-    buy_price: z.number().nonnegative(),
-    sell_price: z.number().nonnegative(),
-    note: z.string().optional().default('')
-  }).parse(req.body);
+app.delete('/api/gardeners/:id', auth, async (req, res, next) => {
+  try {
+    await db.query('DELETE FROM gardeners WHERE id=$1', [Number(req.params.id)]);
+    res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+});
 
-  const total_kg = b.basket * b.kg_per_basket;
-  const buy_total = total_kg * b.buy_price;
-  const sell_total = total_kg * b.sell_price;
+app.post('/api/incomes', auth, async (req, res, next) => {
+  try {
+    const b = z.object({
+      gardener_id: z.number(),
+      date: z.string(),
+      peach_type: z.string().optional().default(''),
+      basket: z.number().nonnegative(),
+      kg_per_basket: z.number().nonnegative(),
+      buy_price: z.number().nonnegative(),
+      sell_price: z.number().nonnegative(),
+      note: z.string().optional().default('')
+    }).parse(req.body);
 
-  const id = run(
-    `
-    INSERT INTO incomes(
-      gardener_id,
-      date,
-      peach_type,
-      basket,
-      kg_per_basket,
-      total_kg,
-      buy_price,
-      sell_price,
-      buy_total,
-      sell_total,
-      note
-    )
-    VALUES(?,?,?,?,?,?,?,?,?,?,?)
-    `,
-    [
+    const total_kg = b.basket * b.kg_per_basket;
+    const buy_total = total_kg * b.buy_price;
+    const sell_total = total_kg * b.sell_price;
+
+    const result = await db.query(`
+      INSERT INTO incomes(
+        gardener_id, date, peach_type, basket, kg_per_basket,
+        total_kg, buy_price, sell_price, buy_total, sell_total, note
+      )
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+      RETURNING *
+    `, [
       b.gardener_id,
       b.date,
       b.peach_type.trim(),
@@ -144,65 +143,83 @@ app.post('/api/incomes', auth, (req, res) => {
       b.sell_price,
       buy_total,
       sell_total,
-      b.note
-    ]
-  );
+      b.note.trim()
+    ]);
 
-  res.json(db.prepare('SELECT * FROM incomes WHERE id=?').get(id));
-});
-
-app.delete('/api/incomes/:id', auth, (req, res) => {
-  db.prepare('DELETE FROM incomes WHERE id=?').run(req.params.id);
-  res.json({ ok: true });
-});
-
-app.post('/api/sales', auth, (req, res) => {
-  const b = z.object({
-    gardener_id: z.number(),
-    date: z.string(),
-    kg: z.number().nonnegative(),
-    amount: z.number().nonnegative(),
-    customer: z.string().optional().default('')
-  }).parse(req.body);
-
-  const id = run(
-    'INSERT INTO sales(gardener_id, date, kg, amount, customer) VALUES(?,?,?,?,?)',
-    [b.gardener_id, b.date, b.kg, b.amount, b.customer.trim()]
-  );
-
-  res.json(db.prepare('SELECT * FROM sales WHERE id=?').get(id));
-});
-
-app.delete('/api/sales/:id', auth, (req, res) => {
-  db.prepare('DELETE FROM sales WHERE id=?').run(req.params.id);
-  res.json({ ok: true });
-});
-
-app.post('/api/payments', auth, (req, res) => {
-  const b = z.object({
-    gardener_id: z.number(),
-    date: z.string(),
-    amount: z.number().nonnegative(),
-    note: z.string().optional().default('')
-  }).parse(req.body);
-
-  const id = run(
-    'INSERT INTO payments(gardener_id, date, amount, note) VALUES(?,?,?,?)',
-    [b.gardener_id, b.date, b.amount, b.note.trim()]
-  );
-
-  res.json(db.prepare('SELECT * FROM payments WHERE id=?').get(id));
-});
-
-app.delete('/api/gardeners/:id', auth, (req, res) => {
-  try {
-    db.prepare('DELETE FROM gardeners WHERE id = ?').run(Number(req.params.id));
-    res.json({ ok: true });
+    res.json(result.rows[0]);
   } catch (e) {
-    console.error('Bog‘bon o‘chirish xatosi:', e);
-    res.status(500).json({ error: e.message });
+    next(e);
   }
 });
+
+app.delete('/api/incomes/:id', auth, async (req, res, next) => {
+  try {
+    await db.query('DELETE FROM incomes WHERE id=$1', [Number(req.params.id)]);
+    res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+});
+
+app.post('/api/sales', auth, async (req, res, next) => {
+  try {
+    const b = z.object({
+      gardener_id: z.number(),
+      date: z.string(),
+      kg: z.number().nonnegative(),
+      amount: z.number().nonnegative(),
+      customer: z.string().optional().default('')
+    }).parse(req.body);
+
+    const result = await db.query(
+      'INSERT INTO sales(gardener_id, date, kg, amount, customer) VALUES($1,$2,$3,$4,$5) RETURNING *',
+      [b.gardener_id, b.date, b.kg, b.amount, b.customer.trim()]
+    );
+
+    res.json(result.rows[0]);
+  } catch (e) {
+    next(e);
+  }
+});
+
+app.delete('/api/sales/:id', auth, async (req, res, next) => {
+  try {
+    await db.query('DELETE FROM sales WHERE id=$1', [Number(req.params.id)]);
+    res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+});
+
+app.post('/api/payments', auth, async (req, res, next) => {
+  try {
+    const b = z.object({
+      gardener_id: z.number(),
+      date: z.string(),
+      amount: z.number().nonnegative(),
+      note: z.string().optional().default('')
+    }).parse(req.body);
+
+    const result = await db.query(
+      'INSERT INTO payments(gardener_id, date, amount, note) VALUES($1,$2,$3,$4) RETURNING *',
+      [b.gardener_id, b.date, b.amount, b.note.trim()]
+    );
+
+    res.json(result.rows[0]);
+  } catch (e) {
+    next(e);
+  }
+});
+
+app.delete('/api/payments/:id', auth, async (req, res, next) => {
+  try {
+    await db.query('DELETE FROM payments WHERE id=$1', [Number(req.params.id)]);
+    res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+});
+
 app.use((err, req, res, next) => {
   console.error(err);
 
@@ -213,9 +230,14 @@ app.use((err, req, res, next) => {
     });
   }
 
-  res.status(500).json({ error: 'Server xatosi' });
+  res.status(500).json({ error: err.message || 'Server xatosi' });
 });
 
-app.listen(PORT, () => {
-  console.log(`Broker server: http://localhost:${PORT}`);
-});
+async function start() {
+  await db.initDatabase();
+  app.listen(PORT, () => {
+    console.log(`Broker server: http://localhost:${PORT}`);
+  });
+}
+
+start();
